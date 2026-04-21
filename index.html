@@ -19,15 +19,14 @@
       transition: max-height 0.35s ease, opacity 0.3s ease;
       overflow: hidden;
     }
-    #form-chevron {
-      transition: transform 0.3s ease;
-    }
+    #form-chevron { transition: transform 0.3s ease; }
 
     .progress-track {
-      background: #e2e8f0;
+      background: #e5e7eb;
       border-radius: 9999px;
-      height: 8px;
+      height: 4px;
       overflow: hidden;
+      margin-top: 4px;
     }
     .progress-fill {
       height: 100%;
@@ -39,8 +38,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 32px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       border: none;
       background: transparent;
@@ -50,36 +49,41 @@
 
     @keyframes pulse-warn {
       0%, 100% { opacity: 1; }
-      50%       { opacity: 0.5; }
+      50%       { opacity: 0.4; }
     }
     .overdue-pulse { animation: pulse-warn 2s ease-in-out infinite; }
 
-    .item-row { transition: background-color 0.15s; }
-    .item-row:hover { background-color: rgba(240, 253, 250, 0.8); }
+    .task-row { transition: background-color 0.12s; }
+    .task-row:hover { background-color: #f9fafb; }
 
-    .delete-btn { opacity: 0; transition: opacity 0.2s; }
-    .item-row:hover .delete-btn { opacity: 1; }
+    .pencil-icon { opacity: 0; transition: opacity 0.2s; }
+    .task-row:hover .pencil-icon { opacity: 1; }
 
-    #mode-thumb   { transition: transform 0.2s ease; }
-    #mode-toggle  { transition: background-color 0.2s ease; }
+    .editable-cell { cursor: pointer; }
+    .editable-cell:hover .cell-inner { background-color: rgba(100,116,139,0.06); border-radius: 6px; }
 
-    /* iOSの自動ズームを防ぐ（16px未満だとズームが発生する） */
+    #mode-thumb  { transition: transform 0.2s ease; }
+    #mode-toggle { transition: background-color 0.2s ease; }
+
     input, select, textarea { font-size: 16px !important; }
 
+    .tab-btn { transition: color 0.15s, border-color 0.15s, background-color 0.15s; }
+
     @media (max-width: 640px) {
-      .delete-btn { opacity: 1; }
+      .pencil-icon { opacity: 0.4; }
     }
   </style>
 </head>
-<body class="min-h-screen" style="background: linear-gradient(135deg,#f0fdf9 0%,#ecfeff 50%,#f0f9ff 100%)">
+<body class="min-h-screen bg-gray-100">
 
-  <!-- ── Header ──────────────────────────────────────────── -->
-  <header class="bg-white/80 backdrop-blur-sm border-b border-teal-100 sticky top-0 z-30 shadow-sm">
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
     <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-      <span class="text-2xl">🧹</span>
+      <img src="logo.png" alt="" class="w-8 h-8 rounded-lg object-cover"
+        onerror="this.style.display='none'">
       <div>
-        <h1 class="text-lg font-bold text-teal-700 leading-tight">タスクトラッカー</h1>
-        <p class="text-xs text-teal-400">清潔な空間を保ちましょう</p>
+        <h1 class="text-lg font-bold text-gray-800 leading-tight">タスクトラッカー</h1>
+        <p class="text-xs text-gray-400">タスクを管理しましょう</p>
       </div>
       <div class="ml-auto flex items-center gap-2">
         <span class="text-xs text-gray-400">ローカル</span>
@@ -95,49 +99,47 @@
     </div>
   </header>
 
-  <main class="max-w-5xl mx-auto px-4 py-5 space-y-5">
+  <main class="max-w-5xl mx-auto px-4 py-5 space-y-4">
 
-    <!-- ── 登録フォーム（折りたたみ） ──────────────────────── -->
-    <section class="bg-white rounded-2xl shadow-sm border border-teal-100/60">
+    <!-- ── 登録フォーム（折りたたみ） ──────────────────────────── -->
+    <section class="bg-white rounded-2xl shadow-sm border border-gray-200">
 
       <button id="form-toggle"
-        class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-teal-50/50 transition-colors rounded-2xl"
+        class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors rounded-2xl"
         onclick="toggleForm()">
-        <div class="flex items-center gap-2 text-teal-700 font-semibold">
-          <svg class="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex items-center gap-2 text-gray-700 font-semibold">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
           </svg>
-          掃除場所を登録
+          タスクを登録
         </div>
-        <svg id="form-chevron" class="w-5 h-5 text-teal-400"
-          style="transform:rotate(180deg)"
+        <svg id="form-chevron" class="w-5 h-5 text-gray-400"
           fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
         </svg>
       </button>
 
-      <div id="form-content" style="max-height:600px;opacity:1;">
+      <div id="form-content">
         <div class="px-5 pb-5">
-          <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+          <div class="flex flex-col sm:flex-row gap-3 items-end">
 
-            <!-- 掃除場所 -->
-            <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1.5">掃除場所</label>
-              <input id="input-place" type="text" placeholder="例：シンク"
-                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent placeholder-gray-300"
-                onkeydown="if(event.key==='Enter') addItem()"/>
+            <!-- タスク名 -->
+            <div class="flex-1">
+              <label class="block text-xs font-medium text-gray-500 mb-1.5">タスク名</label>
+              <input id="input-name" type="text" placeholder="例：企画書を作成する"
+                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent placeholder-gray-300"
+                onkeydown="if(event.key==='Enter') addTask()"/>
             </div>
 
             <!-- カテゴリ -->
-            <div>
+            <div class="w-full sm:w-44">
               <label class="block text-xs font-medium text-gray-500 mb-1.5">カテゴリ</label>
               <div class="flex gap-2">
                 <select id="input-category"
-                  class="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent">
+                  class="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent">
                 </select>
-                <button onclick="openCategoryManageModal()"
-                  title="カテゴリを管理"
-                  class="px-2.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-xl border border-teal-200 transition-colors flex items-center justify-center">
+                <button onclick="openCategoryModal()" title="カテゴリを管理"
+                  class="px-2.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-xl border border-gray-200 transition-colors flex items-center justify-center">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -146,26 +148,9 @@
               </div>
             </div>
 
-            <!-- 頻度 -->
-            <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1.5">頻度（日）</label>
-              <div class="flex items-center gap-2">
-                <button onclick="changeFreq(-1)"
-                  class="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-600 font-bold text-xl transition-colors select-none">
-                  −
-                </button>
-                <input id="input-freq" type="number" value="7" min="1" max="365"
-                  class="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent"/>
-                <button onclick="changeFreq(1)"
-                  class="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-600 font-bold text-xl transition-colors select-none">
-                  ＋
-                </button>
-              </div>
-            </div>
-
             <!-- 追加ボタン -->
-            <button onclick="addItem()"
-              class="w-full px-4 py-2.5 bg-teal-500 hover:bg-teal-600 active:bg-teal-700 text-white rounded-xl font-semibold text-sm shadow-sm transition-colors">
+            <button onclick="addTask()"
+              class="w-full sm:w-auto px-5 py-2.5 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white rounded-xl font-semibold text-sm shadow-sm transition-colors whitespace-nowrap">
               追加する
             </button>
           </div>
@@ -173,22 +158,12 @@
       </div>
     </section>
 
-    <!-- ── 一覧 ───────────────────────────────────────────── -->
-    <section class="bg-white rounded-2xl shadow-sm border border-teal-100/60">
+    <!-- ── タスク一覧 ────────────────────────────────────────── -->
+    <section class="bg-white rounded-2xl shadow-sm border border-gray-200">
 
-      <!-- ヘッダー -->
-      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-        <h2 class="font-semibold text-gray-700 flex items-center gap-2">
-          掃除リスト
-          <span id="item-count" class="text-sm font-normal text-gray-400"></span>
-        </h2>
-        <button onclick="completeAll()"
-          class="flex items-center gap-1.5 px-4 py-2 bg-green-50 hover:bg-green-100 active:bg-green-200 text-green-700 rounded-xl text-sm font-medium border border-green-200 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          すべて掃除完了
-        </button>
+      <!-- カテゴリタブ -->
+      <div class="px-4 pt-3 border-b border-gray-200 overflow-x-auto">
+        <div id="tab-list" class="flex gap-0.5 min-w-max"></div>
       </div>
 
       <!-- テーブル -->
@@ -196,62 +171,67 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-gray-100">
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">掃除場所</th>
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">カテゴリ</th>
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">頻度</th>
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">最終掃除日</th>
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-teal-500 transition-colors"
-                onclick="toggleSort()">
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                タスク名
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-slate-600 transition-colors"
+                onclick="setSort('priority')">
                 <span class="flex items-center gap-1">
-                  期限 <span id="sort-icon" class="text-teal-400">↑</span>
+                  優先度 <span id="sort-priority-icon" class="text-slate-500 text-sm"></span>
                 </span>
               </th>
-              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">完了</th>
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-slate-600 transition-colors"
+                onclick="setSort('deadline')">
+                <span class="flex items-center gap-1">
+                  締切日 <span id="sort-deadline-icon" class="text-slate-500 text-sm"></span>
+                </span>
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                メモ
+              </th>
+              <th class="px-3 py-3"></th>
             </tr>
           </thead>
-          <tbody id="item-list"></tbody>
+          <tbody id="task-list"></tbody>
         </table>
 
         <!-- 空の状態 -->
         <div id="empty-state" class="hidden py-16 text-center">
-          <div class="text-5xl mb-3">✨</div>
-          <p class="text-gray-400 font-medium">まだ登録された場所がありません</p>
-          <p class="text-gray-300 text-xs mt-1">上のフォームから掃除場所を追加してください</p>
+          <div class="text-4xl mb-3">📋</div>
+          <p class="text-gray-400 font-medium">タスクがありません</p>
+          <p class="text-gray-300 text-xs mt-1">上のフォームからタスクを追加してください</p>
         </div>
       </div>
     </section>
+
   </main>
 
-  <!-- ── カテゴリ管理モーダル ─────────────────────────────── -->
-  <div id="category-manage-modal"
+  <!-- ── カテゴリ管理モーダル ──────────────────────────────────── -->
+  <div id="category-modal"
     class="fixed inset-0 flex items-center justify-center z-50 hidden"
-    style="background:rgba(0,0,0,0.25);backdrop-filter:blur(4px)"
-    onclick="if(event.target===this) closeCategoryManageModal()">
+    style="background:rgba(0,0,0,0.2);backdrop-filter:blur(4px)"
+    onclick="if(event.target===this) closeCategoryModal()">
     <div class="bg-white rounded-2xl shadow-2xl w-96 mx-4 flex flex-col" style="max-height:85vh">
 
-      <!-- Modal Header -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <h3 class="font-semibold text-gray-700">カテゴリ管理</h3>
-        <button onclick="closeCategoryManageModal()"
-          class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+        <button onclick="closeCategoryModal()" class="icon-btn text-gray-400 hover:text-gray-600 hover:bg-gray-100">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
 
-      <!-- Category List -->
       <ul id="category-list" class="overflow-y-auto flex-1 px-4 py-3 space-y-1"></ul>
 
-      <!-- Add New -->
       <div class="px-4 py-4 border-t border-gray-100">
         <p class="text-xs font-medium text-gray-400 mb-2">新しいカテゴリを追加</p>
         <div class="flex gap-2">
-          <input id="new-category-input" type="text" placeholder="例：ベランダ"
-            class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+          <input id="new-category-input" type="text" placeholder="カテゴリ名"
+            class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
             onkeydown="if(event.key==='Enter') addCategory()"/>
           <button onclick="addCategory()"
-            class="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-xl text-sm font-semibold transition-colors whitespace-nowrap">
+            class="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors whitespace-nowrap">
             追加
           </button>
         </div>
@@ -260,688 +240,7 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js';
-    import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/12.12.0/firebase-database.js';
-
-    const firebaseConfig = {
-      apiKey:            'AIzaSyCW2_2Ze70vZAzrfIupUvZeYjBxlqqAFwU',
-      authDomain:        'cleaning-checker-cefc6.firebaseapp.com',
-      databaseURL:       'https://cleaning-checker-cefc6-default-rtdb.asia-southeast1.firebasedatabase.app',
-      projectId:         'cleaning-checker-cefc6',
-      storageBucket:     'cleaning-checker-cefc6.firebasestorage.app',
-      messagingSenderId: '1097101786192',
-      appId:             '1:1097101786192:web:7fb9568e22d9588b036555',
-    };
-    const fbApp  = initializeApp(firebaseConfig);
-    const db     = getDatabase(fbApp);
-    const DB_REF = ref(db, 'cleaning-checker');
-
-    // ─── State ───────────────────────────────────────────────
-    let items      = [];
-    let categories = ['キッチン', 'バスルーム', 'リビング', 'トイレ', 'その他'];
-    let sortOrder  = 'asc';
-    let formCollapsed = false;
-
-    const ITEMS_KEY = 'cleaning-checker-items';
-    const CATS_KEY  = 'cleaning-checker-categories';
-
-    // ─── Persistence ─────────────────────────────────────────
-    function loadLocal() {
-      try {
-        const si = localStorage.getItem(ITEMS_KEY);
-        const sc = localStorage.getItem(CATS_KEY);
-        if (si) items      = JSON.parse(si);
-        if (sc) categories = JSON.parse(sc);
-      } catch(e) {}
-    }
-
-    function saveLocal() {
-      localStorage.setItem(ITEMS_KEY, JSON.stringify(items));
-      localStorage.setItem(CATS_KEY,  JSON.stringify(categories));
-    }
-
-    const MODE_KEY   = 'cleaning-checker-mode';
-    let storageMode  = localStorage.getItem(MODE_KEY) || 'local';
-    let fbUnsub      = null;
-
-    function saveData() {
-      saveLocal();
-      if (storageMode === 'firebase') set(DB_REF, { items, categories });
-    }
-
-    // ─── Firebase listener ────────────────────────────────────
-    function enableFirebaseListener() {
-      if (fbUnsub) return;
-      fbUnsub = onValue(DB_REF, snapshot => {
-        if (storageMode !== 'firebase') return;
-        const data = snapshot.val();
-        if (data !== null) {
-          items      = data.items      || [];
-          categories = data.categories || ['キッチン', 'バスルーム', 'リビング', 'トイレ', 'その他'];
-          saveLocal();
-          renderCategorySelect();
-          renderList();
-          const modal = document.getElementById('category-manage-modal');
-          if (!modal.classList.contains('hidden') && editingCatIndex === -1) {
-            renderCategoryList();
-          }
-        } else {
-          set(DB_REF, { items, categories });
-        }
-      });
-    }
-
-    function disableFirebaseListener() {
-      if (fbUnsub) { fbUnsub(); fbUnsub = null; }
-    }
-
-    function updateModeUI() {
-      const toggle = document.getElementById('mode-toggle');
-      const thumb  = document.getElementById('mode-thumb');
-      if (storageMode === 'firebase') {
-        toggle.style.background    = '#0d9488';
-        thumb.style.transform      = 'translateX(20px)';
-      } else {
-        toggle.style.background    = '#d1d5db';
-        thumb.style.transform      = 'translateX(0)';
-      }
-    }
-
-    async function toggleStorageMode() {
-      if (storageMode === 'firebase') {
-        const ok = confirm(
-          'ローカル保存に切り替えます。\n' +
-          'Firebaseとの同期を停止し、このデバイスにのみ保存されます。\n' +
-          '続けますか？'
-        );
-        if (!ok) return;
-        disableFirebaseListener();
-        storageMode = 'local';
-        localStorage.setItem(MODE_KEY, 'local');
-        updateModeUI();
-      } else {
-        const snapshot = await get(DB_REF);
-        const hasData  = snapshot.val() !== null;
-        const ok = confirm(
-          hasData
-            ? 'Firebaseにデータが存在します。\nFirebaseのデータを優先して同期します（ローカルのデータは上書きされます）。\n続けますか？'
-            : 'Firebaseにデータがありません。\n現在のローカルデータをFirebaseにアップロードして同期します。\n続けますか？'
-        );
-        if (!ok) return;
-        storageMode = 'firebase';
-        localStorage.setItem(MODE_KEY, 'firebase');
-        if (!hasData) set(DB_REF, { items, categories });
-        enableFirebaseListener();
-        updateModeUI();
-      }
-    }
-
-    // ─── Date helpers ────────────────────────────────────────
-    function todayStr() {
-      return new Date().toISOString().split('T')[0];
-    }
-
-    function parseLocal(str) {
-      return new Date(str + 'T00:00:00');
-    }
-
-    function formatDate(str) {
-      if (!str) return '—';
-      const d = parseLocal(str);
-      return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
-    }
-
-    function pad(n) { return String(n).padStart(2, '0'); }
-
-    function deadlineDate(lastCleaned, freq) {
-      const d = parseLocal(lastCleaned);
-      d.setDate(d.getDate() + freq);
-      return d;
-    }
-
-    function progressRatio(lastCleaned, freq) {
-      const last = parseLocal(lastCleaned);
-      const now  = new Date(); now.setHours(0, 0, 0, 0);
-      return Math.floor((now - last) / 86400000) / freq;
-    }
-
-    function daysLeft(lastCleaned, freq) {
-      const dl  = deadlineDate(lastCleaned, freq);
-      const now = new Date(); now.setHours(0, 0, 0, 0);
-      return Math.ceil((dl - now) / 86400000);
-    }
-
-    function barColor(ratio) {
-      if (ratio < 0.50) return '#22c55e';  // green
-      if (ratio < 0.75) return '#84cc16';  // lime
-      if (ratio < 1.00) return '#f97316';  // orange
-      return '#ef4444';                     // red (overdue)
-    }
-
-    // ─── Form ────────────────────────────────────────────────
-    function toggleForm() {
-      formCollapsed = !formCollapsed;
-      const content = document.getElementById('form-content');
-      const chevron = document.getElementById('form-chevron');
-      if (formCollapsed) {
-        content.style.maxHeight = '0';
-        content.style.opacity   = '0';
-        chevron.style.transform = 'rotate(0deg)';
-      } else {
-        content.style.maxHeight = '600px';
-        content.style.opacity   = '1';
-        chevron.style.transform = 'rotate(180deg)';
-      }
-    }
-
-    function changeFreq(delta) {
-      const inp = document.getElementById('input-freq');
-      inp.value = Math.max(1, (parseInt(inp.value) || 1) + delta);
-    }
-
-    function addItem() {
-      const place    = document.getElementById('input-place').value.trim();
-      const category = document.getElementById('input-category').value;
-      const freq     = Math.max(1, parseInt(document.getElementById('input-freq').value) || 1);
-
-      if (!place) {
-        const inp = document.getElementById('input-place');
-        inp.classList.add('ring-2', 'ring-red-400');
-        inp.focus();
-        setTimeout(() => inp.classList.remove('ring-2', 'ring-red-400'), 1500);
-        return;
-      }
-
-      items.push({
-        id: Date.now().toString(),
-        place,
-        category,
-        frequency:   freq,
-        lastCleaned: todayStr(),
-      });
-      saveData();
-      renderList();
-      document.getElementById('input-place').value = '';
-      document.getElementById('input-place').focus();
-    }
-
-    // ─── Category manage modal ───────────────────────────────
-    let editingCatIndex = -1;
-    let editingFreqId   = null;
-    let editingPlaceId  = null;
-    let editingRowCatId = null;
-    let editingDateId   = null;
-
-    function openCategoryManageModal() {
-      editingCatIndex = -1;
-      document.getElementById('category-manage-modal').classList.remove('hidden');
-      document.getElementById('new-category-input').value = '';
-      renderCategoryList();
-      setTimeout(() => document.getElementById('new-category-input').focus(), 50);
-    }
-
-    function closeCategoryManageModal() {
-      document.getElementById('category-manage-modal').classList.add('hidden');
-      editingCatIndex = -1;
-    }
-
-    function renderCategoryList() {
-      const ul = document.getElementById('category-list');
-      if (categories.length === 0) {
-        ul.innerHTML = '<li class="text-center text-gray-400 text-sm py-4">カテゴリがありません</li>';
-        return;
-      }
-      ul.innerHTML = categories.map((cat, i) => {
-        const useCount = items.filter(item => item.category === cat).length;
-        if (i === editingCatIndex) {
-          return `
-<li class="flex items-center gap-2 rounded-xl px-3 py-2 bg-teal-50">
-  <input id="edit-cat-input" type="text" value="${esc(cat)}"
-    class="flex-1 border border-teal-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
-    onkeydown="if(event.key==='Enter') saveEditCategory(${i}); else if(event.key==='Escape') cancelEditCategory()"/>
-  <button onclick="saveEditCategory(${i})"
-    class="icon-btn text-teal-600 hover:bg-teal-100" title="保存">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-    </svg>
-  </button>
-  <button onclick="cancelEditCategory()"
-    class="icon-btn text-gray-400 hover:bg-gray-100" title="キャンセル">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-    </svg>
-  </button>
-</li>`;
-        }
-        return `
-<li class="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-gray-50 group">
-  <span class="flex-1 text-sm text-gray-700">${esc(cat)}</span>
-  ${useCount > 0
-    ? `<span class="text-xs text-gray-400">${useCount}件</span>`
-    : ''}
-  <button onclick="startEditCategory(${i})"
-    class="icon-btn text-gray-300 hover:text-teal-500 hover:bg-teal-50 opacity-0 group-hover:opacity-100 transition-opacity" title="編集">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-    </svg>
-  </button>
-  <button onclick="deleteCategory(${i})"
-    class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" title="削除">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-    </svg>
-  </button>
-</li>`;
-      }).join('');
-
-      if (editingCatIndex >= 0) {
-        setTimeout(() => {
-          const inp = document.getElementById('edit-cat-input');
-          if (inp) { inp.focus(); inp.select(); }
-        }, 30);
-      }
-    }
-
-    function startEditCategory(i) {
-      editingCatIndex = i;
-      renderCategoryList();
-    }
-
-    function cancelEditCategory() {
-      editingCatIndex = -1;
-      renderCategoryList();
-    }
-
-    function saveEditCategory(i) {
-      const inp     = document.getElementById('edit-cat-input');
-      const newName = inp ? inp.value.trim() : '';
-      if (!newName) { if (inp) inp.focus(); return; }
-      if (newName === categories[i]) { cancelEditCategory(); return; }
-      if (categories.includes(newName)) {
-        alert(`「${newName}」はすでに存在します`);
-        inp.focus();
-        return;
-      }
-      const oldName = categories[i];
-      categories[i] = newName;
-      items.forEach(item => { if (item.category === oldName) item.category = newName; });
-      saveData();
-      editingCatIndex = -1;
-      renderCategoryList();
-      renderCategorySelect();
-      renderList();
-    }
-
-    function deleteCategory(i) {
-      const name     = categories[i];
-      const useCount = items.filter(item => item.category === name).length;
-      const msg = useCount > 0
-        ? `「${name}」は${useCount}件の掃除場所で使用中です。\n削除すると「その他」に変更されます。削除しますか？`
-        : `「${name}」を削除しますか？`;
-      if (!confirm(msg)) return;
-      if (useCount > 0) {
-        const fallback = categories.find((c, idx) => idx !== i) || '';
-        items.forEach(item => { if (item.category === name) item.category = fallback; });
-      }
-      categories.splice(i, 1);
-      editingCatIndex = -1;
-      saveData();
-      renderCategoryList();
-      renderCategorySelect();
-      renderList();
-    }
-
-    function addCategory() {
-      const inp  = document.getElementById('new-category-input');
-      const name = inp.value.trim();
-      if (!name) { inp.focus(); return; }
-      if (categories.includes(name)) {
-        alert(`「${name}」はすでに存在します`);
-        inp.focus();
-        return;
-      }
-      categories.push(name);
-      saveData();
-      renderCategoryList();
-      renderCategorySelect();
-      document.getElementById('input-category').value = name;
-      inp.value = '';
-      inp.focus();
-    }
-
-    // ─── Last cleaned date inline edit ───────────────────────
-    function startEditDate(id) {
-      editingDateId = id; editingPlaceId = null; editingRowCatId = null; editingFreqId = null;
-      renderList();
-    }
-    function cancelEditDate() { editingDateId = null; renderList(); }
-    function saveEditDate(id) {
-      const y = document.getElementById('edit-date-year')?.value;
-      const m = document.getElementById('edit-date-month')?.value;
-      const d = document.getElementById('edit-date-day')?.value;
-      if (!y || !m || !d) return;
-      const item = items.find(i => i.id === id);
-      if (item) {
-        item.lastCleaned = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        saveData();
-      }
-      editingDateId = null; renderList();
-    }
-    function updateDayOptions() {
-      const yearSel  = document.getElementById('edit-date-year');
-      const monthSel = document.getElementById('edit-date-month');
-      const daySel   = document.getElementById('edit-date-day');
-      if (!yearSel || !monthSel || !daySel) return;
-      const curDay  = parseInt(daySel.value);
-      const maxDays = new Date(parseInt(yearSel.value), parseInt(monthSel.value), 0).getDate();
-      const newDay  = Math.min(curDay, maxDays);
-      daySel.innerHTML = Array.from({ length: maxDays }, (_, i) =>
-        `<option value="${i+1}" ${i+1 === newDay ? 'selected' : ''}>${i+1}</option>`
-      ).join('');
-    }
-
-    // ─── Place inline edit ───────────────────────────────────
-    function startEditPlace(id) {
-      editingPlaceId = id; editingRowCatId = null; editingFreqId = null;
-      renderList();
-      setTimeout(() => { const i = document.getElementById('edit-place-input'); if (i) { i.focus(); i.select(); } }, 30);
-    }
-    function cancelEditPlace() { editingPlaceId = null; renderList(); }
-    function saveEditPlace(id) {
-      const inp  = document.getElementById('edit-place-input');
-      const val  = inp ? inp.value.trim() : '';
-      if (!val) { if (inp) inp.focus(); return; }
-      const item = items.find(i => i.id === id);
-      if (item) { item.place = val; saveData(); }
-      editingPlaceId = null; renderList();
-    }
-
-    // ─── Category inline edit (row) ──────────────────────────
-    function startEditRowCat(id) {
-      editingRowCatId = id; editingPlaceId = null; editingFreqId = null;
-      renderList();
-      setTimeout(() => { const s = document.getElementById('edit-row-cat-select'); if (s) s.focus(); }, 30);
-    }
-    function cancelEditRowCat() { editingRowCatId = null; renderList(); }
-    function saveEditRowCat(id) {
-      const sel  = document.getElementById('edit-row-cat-select');
-      const val  = sel ? sel.value : '';
-      const item = items.find(i => i.id === id);
-      if (item && val) { item.category = val; saveData(); }
-      editingRowCatId = null; renderList();
-    }
-
-    // ─── Frequency inline edit ───────────────────────────────
-    function startEditFreq(id) {
-      editingFreqId = id;
-      renderList();
-      setTimeout(() => {
-        const inp = document.getElementById('edit-freq-input');
-        if (inp) { inp.focus(); inp.select(); }
-      }, 30);
-    }
-
-    function cancelEditFreq() {
-      editingFreqId = null;
-      renderList();
-    }
-
-    function changeEditFreq(delta) {
-      const inp = document.getElementById('edit-freq-input');
-      if (inp) inp.value = Math.max(1, (parseInt(inp.value) || 1) + delta);
-    }
-
-    function saveEditFreq(id) {
-      const inp  = document.getElementById('edit-freq-input');
-      const freq = Math.max(1, parseInt(inp ? inp.value : 1) || 1);
-      const item = items.find(i => i.id === id);
-      if (item) { item.frequency = freq; saveData(); }
-      editingFreqId = null;
-      renderList();
-    }
-
-    // ─── Item actions ────────────────────────────────────────
-    function completeItem(id) {
-      const item = items.find(i => i.id === id);
-      if (item) { item.lastCleaned = todayStr(); saveData(); renderList(); }
-    }
-
-    function deleteItem(id) {
-      if (!confirm('この掃除場所を削除しますか？')) return;
-      items = items.filter(i => i.id !== id);
-      saveData();
-      renderList();
-    }
-
-    function completeAll() {
-      if (items.length === 0) return;
-      items.forEach(i => i.lastCleaned = todayStr());
-      saveData();
-      renderList();
-    }
-
-    function toggleSort() {
-      sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-      document.getElementById('sort-icon').textContent = sortOrder === 'asc' ? '↑' : '↓';
-      renderList();
-    }
-
-    // ─── Render ──────────────────────────────────────────────
-    function renderCategorySelect() {
-      const sel  = document.getElementById('input-category');
-      const prev = sel.value;
-      sel.innerHTML = categories
-        .map(c => `<option value="${esc(c)}">${esc(c)}</option>`)
-        .join('');
-      if (categories.includes(prev)) sel.value = prev;
-    }
-
-    function renderList() {
-      const tbody = document.getElementById('item-list');
-      const empty = document.getElementById('empty-state');
-      document.getElementById('item-count').textContent = `(${items.length}件)`;
-
-      if (items.length === 0) {
-        tbody.innerHTML = '';
-        empty.classList.remove('hidden');
-        return;
-      }
-      empty.classList.add('hidden');
-
-      const sorted = [...items].sort((a, b) => {
-        const da = deadlineDate(a.lastCleaned, a.frequency);
-        const db = deadlineDate(b.lastCleaned, b.frequency);
-        return sortOrder === 'asc' ? da - db : db - da;
-      });
-
-      tbody.innerHTML = sorted.map(item => {
-        const ratio  = progressRatio(item.lastCleaned, item.frequency);
-        const pct    = Math.min(ratio * 100, 100).toFixed(1);
-        const color  = barColor(ratio);
-        const days   = daysLeft(item.lastCleaned, item.frequency);
-        const dl     = deadlineDate(item.lastCleaned, item.frequency);
-        const dlStr  = `${dl.getFullYear()}/${pad(dl.getMonth()+1)}/${pad(dl.getDate())}`;
-        const isOver = days < 0;
-
-        const daysLabel = isOver
-          ? `<span class="text-red-500 text-xs font-semibold">${Math.abs(days)}日超過</span>`
-          : days === 0
-            ? `<span class="text-orange-500 text-xs font-semibold">今日まで</span>`
-            : `<span class="text-gray-400 text-xs">あと${days}日</span>`;
-
-        const freqCell = item.id === editingFreqId
-          ? `<td class="px-5 py-2 whitespace-nowrap">
-               <div class="flex items-center gap-1">
-                 <button onclick="changeEditFreq(-1)" class="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 font-bold select-none">−</button>
-                 <input id="edit-freq-input" type="number" value="${item.frequency}" min="1" max="365"
-                   class="w-14 border border-teal-300 rounded-lg px-1 py-1 text-center focus:outline-none focus:ring-2 focus:ring-teal-400"
-                   onkeydown="if(event.key==='Enter') saveEditFreq('${esc(item.id)}'); else if(event.key==='Escape') cancelEditFreq()"/>
-                 <button onclick="changeEditFreq(1)" class="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 font-bold select-none">＋</button>
-                 <button onclick="saveEditFreq('${esc(item.id)}')" class="icon-btn text-teal-500 hover:bg-teal-50" title="保存">
-                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                 </button>
-                 <button onclick="cancelEditFreq()" class="icon-btn text-gray-300 hover:bg-gray-100" title="キャンセル">
-                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                 </button>
-               </div>
-             </td>`
-          : `<td class="px-5 py-3.5 text-gray-500 whitespace-nowrap cursor-pointer hover:text-teal-600 hover:bg-teal-50/50 rounded transition-colors"
-               onclick="startEditFreq('${esc(item.id)}')" title="タップして編集">
-               <span class="inline-flex items-center gap-1">
-                 ${item.frequency}日ごと
-                 <svg class="w-3 h-3 opacity-25" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                 </svg>
-               </span>
-             </td>`;
-
-        const pencil = `<svg class="w-3 h-3 opacity-25 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>`;
-
-        const placeCell = item.id === editingPlaceId
-          ? `<td class="px-5 py-2 whitespace-nowrap">
-               <div class="flex items-center gap-1">
-                 <input id="edit-place-input" type="text" value="${esc(item.place)}"
-                   class="border border-teal-300 rounded-lg px-2 py-1 w-32 focus:outline-none focus:ring-2 focus:ring-teal-400"
-                   onkeydown="if(event.key==='Enter') saveEditPlace('${esc(item.id)}'); else if(event.key==='Escape') cancelEditPlace()"/>
-                 <button onclick="saveEditPlace('${esc(item.id)}')" class="icon-btn text-teal-500 hover:bg-teal-50" title="保存">
-                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                 </button>
-                 <button onclick="cancelEditPlace()" class="icon-btn text-gray-300 hover:bg-gray-100" title="キャンセル">
-                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                 </button>
-               </div>
-             </td>`
-          : `<td class="px-5 py-3.5 font-medium text-gray-700 whitespace-nowrap cursor-pointer hover:text-teal-600 hover:bg-teal-50/50 transition-colors"
-               onclick="startEditPlace('${esc(item.id)}')" title="タップして編集">
-               <span class="inline-flex items-center gap-1">${esc(item.place)} ${pencil}</span>
-             </td>`;
-
-        const catCell = item.id === editingRowCatId
-          ? `<td class="px-5 py-2 whitespace-nowrap">
-               <div class="flex items-center gap-1">
-                 <select id="edit-row-cat-select"
-                   class="border border-teal-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400"
-                   onkeydown="if(event.key==='Escape') cancelEditRowCat()">
-                   ${categories.map(c => `<option value="${esc(c)}" ${c === item.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}
-                 </select>
-                 <button onclick="saveEditRowCat('${esc(item.id)}')" class="icon-btn text-teal-500 hover:bg-teal-50" title="保存">
-                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                 </button>
-                 <button onclick="cancelEditRowCat()" class="icon-btn text-gray-300 hover:bg-gray-100" title="キャンセル">
-                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                 </button>
-               </div>
-             </td>`
-          : `<td class="px-5 py-3.5 whitespace-nowrap cursor-pointer hover:bg-teal-50/50 transition-colors"
-               onclick="startEditRowCat('${esc(item.id)}')" title="タップして編集">
-               <span class="inline-flex items-center gap-1">
-                 <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-100">${esc(item.category)}</span>
-                 ${pencil}
-               </span>
-             </td>`;
-
-        return `
-<tr class="item-row border-b border-gray-50 ${isOver ? 'bg-red-50/40' : ''}">
-  ${placeCell}
-  ${catCell}
-  ${freqCell}
-  ${(() => {
-    if (item.id === editingDateId) {
-      const d   = parseLocal(item.lastCleaned);
-      const cy  = d.getFullYear(), cm = d.getMonth()+1, cd = d.getDate();
-      const now = new Date().getFullYear();
-      const years = Array.from({ length: now - 2019 }, (_, i) => 2020 + i);
-      const maxD  = new Date(cy, cm, 0).getDate();
-      return `<td class="px-5 py-2 whitespace-nowrap">
-        <div class="flex items-center gap-1 flex-wrap">
-          <select id="edit-date-year" onchange="updateDayOptions()"
-            class="border border-teal-300 rounded-lg px-1 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
-            ${years.map(y => `<option value="${y}" ${y===cy?'selected':''}>${y}</option>`).join('')}
-          </select><span class="text-gray-400 text-xs">年</span>
-          <select id="edit-date-month" onchange="updateDayOptions()"
-            class="border border-teal-300 rounded-lg px-1 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
-            ${Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${m===cm?'selected':''}>${m}</option>`).join('')}
-          </select><span class="text-gray-400 text-xs">月</span>
-          <select id="edit-date-day"
-            class="border border-teal-300 rounded-lg px-1 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
-            ${Array.from({length:maxD},(_,i)=>i+1).map(dd=>`<option value="${dd}" ${dd===cd?'selected':''}>${dd}</option>`).join('')}
-          </select><span class="text-gray-400 text-xs">日</span>
-          <button onclick="saveEditDate('${esc(item.id)}')" class="icon-btn text-teal-500 hover:bg-teal-50" title="保存">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          </button>
-          <button onclick="cancelEditDate()" class="icon-btn text-gray-300 hover:bg-gray-100" title="キャンセル">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-      </td>`;
-    }
-    return `<td class="px-5 py-3.5 text-gray-500 whitespace-nowrap cursor-pointer hover:text-teal-600 hover:bg-teal-50/50 transition-colors"
-      onclick="startEditDate('${esc(item.id)}')" title="タップして編集">
-      <span class="inline-flex items-center gap-1">${formatDate(item.lastCleaned)} ${pencil}</span>
-    </td>`;
-  })()}
-  <td class="px-5 py-3.5" style="min-width:200px">
-    <div class="space-y-1.5">
-      <div class="flex justify-between items-center gap-2">
-        <span class="text-xs text-gray-400 whitespace-nowrap">${dlStr}</span>
-        ${daysLabel}
-      </div>
-      <div class="progress-track">
-        <div class="progress-fill ${isOver ? 'overdue-pulse' : ''}"
-          style="width:${pct}%;background-color:${color}"></div>
-      </div>
-    </div>
-  </td>
-  <td class="px-5 py-3.5 whitespace-nowrap">
-    <div class="flex items-center gap-1">
-      <button class="icon-btn text-green-500 hover:bg-green-50"
-        onclick="completeItem('${esc(item.id)}')" title="掃除完了">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-        </svg>
-      </button>
-      <button class="icon-btn delete-btn text-gray-300 hover:text-red-400 hover:bg-red-50"
-        onclick="deleteItem('${esc(item.id)}')" title="削除">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-        </svg>
-      </button>
-    </div>
-  </td>
-</tr>`;
-      }).join('');
-    }
-
-    function esc(s) {
-      return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
-    // ─── Expose to global scope (inline onclick handlers) ────
-    Object.assign(window, {
-      toggleForm, changeFreq, addItem,
-      openCategoryManageModal, closeCategoryManageModal,
-      renderCategoryList, startEditCategory, cancelEditCategory,
-      saveEditCategory, deleteCategory, addCategory,
-      completeItem, deleteItem, completeAll, toggleSort,
-      toggleStorageMode,
-      startEditFreq, cancelEditFreq, changeEditFreq, saveEditFreq,
-      startEditPlace, cancelEditPlace, saveEditPlace,
-      startEditRowCat, cancelEditRowCat, saveEditRowCat,
-      startEditDate, cancelEditDate, saveEditDate, updateDayOptions,
-    });
-
-    // ─── Init ────────────────────────────────────────────────
-    loadLocal();
-    renderCategorySelect();
-    renderList();
-    updateModeUI();
-    if (storageMode === 'firebase') enableFirebaseListener();
+    /* JavaScript は次のステップで実装 */
   </script>
 </body>
 </html>
