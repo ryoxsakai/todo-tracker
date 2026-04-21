@@ -241,20 +241,19 @@
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js';
-    import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-database.js';
+    import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey:            'AIzaSyDr4ujQOf-CFboo5S1vOhARXxV291X0Ojc',
       authDomain:        'todo-tracker-25501.firebaseapp.com',
-      databaseURL:       'https://todo-tracker-25501-default-rtdb.firebaseio.com',
       projectId:         'todo-tracker-25501',
       storageBucket:     'todo-tracker-25501.firebasestorage.app',
       messagingSenderId: '1065503949697',
       appId:             '1:1065503949697:web:f90cb340d4df3b4c5cde80',
     };
     const fbApp  = initializeApp(firebaseConfig);
-    const db     = getDatabase(fbApp);
-    const DB_REF = ref(db, 'todo-tracker');
+    const db     = getFirestore(fbApp);
+    const DB_REF = doc(db, 'todo-tracker', 'main');
 
     // ─── State ───────────────────────────────────────────────
     let tasks      = [];
@@ -290,22 +289,22 @@
 
     function saveData() {
       saveLocal();
-      if (storageMode === 'firebase') set(DB_REF, { tasks, categories });
+      if (storageMode === 'firebase') setDoc(DB_REF, { tasks, categories });
     }
 
     // ─── Firebase ────────────────────────────────────────────
     function enableFirebaseListener() {
       if (fbUnsub) return;
-      fbUnsub = onValue(DB_REF, snapshot => {
+      fbUnsub = onSnapshot(DB_REF, snapshot => {
         if (storageMode !== 'firebase') return;
-        const data = snapshot.val();
-        if (data !== null) {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
           tasks      = data.tasks      || [];
           categories = data.categories || ['仕事', '個人', 'その他'];
           saveLocal();
           render();
         } else {
-          set(DB_REF, { tasks, categories });
+          setDoc(DB_REF, { tasks, categories });
         }
       });
     }
@@ -334,15 +333,15 @@
         localStorage.setItem(MODE_KEY, 'local');
         updateModeUI();
       } else {
-        const snapshot = await get(DB_REF);
-        const hasData  = snapshot.val() !== null;
+        const snapshot = await getDoc(DB_REF);
+        const hasData  = snapshot.exists();
         const msg = hasData
           ? 'Firebaseにデータが存在します。\nFirebaseのデータを優先して同期します（ローカルのデータは上書きされます）。\n続けますか？'
           : 'Firebaseにデータがありません。\n現在のローカルデータをFirebaseにアップロードして同期します。\n続けますか？';
         if (!confirm(msg)) return;
         storageMode = 'firebase';
         localStorage.setItem(MODE_KEY, 'firebase');
-        if (!hasData) set(DB_REF, { tasks, categories });
+        if (!hasData) setDoc(DB_REF, { tasks, categories });
         enableFirebaseListener();
         updateModeUI();
       }
