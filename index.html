@@ -240,7 +240,576 @@
   </div>
 
   <script type="module">
-    /* JavaScript は次のステップで実装 */
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js';
+    import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-database.js';
+
+    const firebaseConfig = {
+      apiKey:            'AIzaSyDr4ujQOf-CFboo5S1vOhARXxV291X0Ojc',
+      authDomain:        'todo-tracker-25501.firebaseapp.com',
+      databaseURL:       'https://todo-tracker-25501-default-rtdb.firebaseio.com',
+      projectId:         'todo-tracker-25501',
+      storageBucket:     'todo-tracker-25501.firebasestorage.app',
+      messagingSenderId: '1065503949697',
+      appId:             '1:1065503949697:web:f90cb340d4df3b4c5cde80',
+    };
+    const fbApp  = initializeApp(firebaseConfig);
+    const db     = getDatabase(fbApp);
+    const DB_REF = ref(db, 'todo-tracker');
+
+    // ─── State ───────────────────────────────────────────────
+    let tasks      = [];
+    let categories = ['仕事', '個人', 'その他'];
+    let activeTab  = 'すべて';
+    let sortField  = null;
+    let sortDir    = 'desc';
+    let editingCell = null; // { id, field }
+    let editingCatIdx = -1;
+
+    const TASKS_KEY = 'todo-tracker-tasks';
+    const CATS_KEY  = 'todo-tracker-categories';
+    const MODE_KEY  = 'todo-tracker-mode';
+    const FORM_KEY  = 'todo-tracker-form-collapsed';
+
+    // ─── Persistence ─────────────────────────────────────────
+    function loadLocal() {
+      try {
+        const st = localStorage.getItem(TASKS_KEY);
+        const sc = localStorage.getItem(CATS_KEY);
+        if (st) tasks      = JSON.parse(st);
+        if (sc) categories = JSON.parse(sc);
+      } catch(e) {}
+    }
+
+    function saveLocal() {
+      localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+      localStorage.setItem(CATS_KEY,  JSON.stringify(categories));
+    }
+
+    let storageMode = localStorage.getItem(MODE_KEY) || 'local';
+    let fbUnsub = null;
+
+    function saveData() {
+      saveLocal();
+      if (storageMode === 'firebase') set(DB_REF, { tasks, categories });
+    }
+
+    // ─── Firebase ────────────────────────────────────────────
+    function enableFirebaseListener() {
+      if (fbUnsub) return;
+      fbUnsub = onValue(DB_REF, snapshot => {
+        if (storageMode !== 'firebase') return;
+        const data = snapshot.val();
+        if (data !== null) {
+          tasks      = data.tasks      || [];
+          categories = data.categories || ['仕事', '個人', 'その他'];
+          saveLocal();
+          render();
+        } else {
+          set(DB_REF, { tasks, categories });
+        }
+      });
+    }
+
+    function disableFirebaseListener() {
+      if (fbUnsub) { fbUnsub(); fbUnsub = null; }
+    }
+
+    function updateModeUI() {
+      const toggle = document.getElementById('mode-toggle');
+      const thumb  = document.getElementById('mode-thumb');
+      if (storageMode === 'firebase') {
+        toggle.style.background = '#0d9488';
+        thumb.style.transform   = 'translateX(20px)';
+      } else {
+        toggle.style.background = '#d1d5db';
+        thumb.style.transform   = 'translateX(0)';
+      }
+    }
+
+    async function toggleStorageMode() {
+      if (storageMode === 'firebase') {
+        if (!confirm('ローカル保存に切り替えます。\nFirebaseとの同期を停止し、このデバイスにのみ保存されます。\n続けますか？')) return;
+        disableFirebaseListener();
+        storageMode = 'local';
+        localStorage.setItem(MODE_KEY, 'local');
+        updateModeUI();
+      } else {
+        const snapshot = await get(DB_REF);
+        const hasData  = snapshot.val() !== null;
+        const msg = hasData
+          ? 'Firebaseにデータが存在します。\nFirebaseのデータを優先して同期します（ローカルのデータは上書きされます）。\n続けますか？'
+          : 'Firebaseにデータがありません。\n現在のローカルデータをFirebaseにアップロードして同期します。\n続けますか？';
+        if (!confirm(msg)) return;
+        storageMode = 'firebase';
+        localStorage.setItem(MODE_KEY, 'firebase');
+        if (!hasData) set(DB_REF, { tasks, categories });
+        enableFirebaseListener();
+        updateModeUI();
+      }
+    }
+
+    // ─── Date helpers ─────────────────────────────────────────
+    function todayStr() { return new Date().toISOString().split('T')[0]; }
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function formatDate(str) {
+      if (!str) return null;
+      const d = new Date(str + 'T00:00:00');
+      return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
+    }
+
+    function daysLeft(str) {
+      if (!str) return null;
+      const dl  = new Date(str + 'T00:00:00');
+      const now = new Date(); now.setHours(0,0,0,0);
+      return Math.ceil((dl - now) / 86400000);
+    }
+
+    function barColor(days) {
+      if (days === null) return '#22c55e';
+      if (days >= 14) return '#22c55e';
+      if (days >= 7)  return '#84cc16';
+      if (days >= 3)  return '#f97316';
+      return '#ef4444';
+    }
+
+    function barPct(days) {
+      if (days === null) return 0;
+      return Math.min(100, Math.max(4, (14 - days) / 14 * 100)).toFixed(1);
+    }
+
+    // ─── Priority helpers ──────────────────────────────────────
+    const PRI_LABEL = { 3: '高', 2: '中', 1: '低' };
+    const PRI_CLASS = {
+      3: 'bg-red-50 text-red-600 border border-red-100',
+      2: 'bg-yellow-50 text-yellow-600 border border-yellow-100',
+      1: 'bg-blue-50 text-blue-600 border border-blue-100',
+    };
+
+    // ─── Form ─────────────────────────────────────────────────
+    function initFormState() {
+      const collapsed = localStorage.getItem(FORM_KEY) === 'true';
+      const content   = document.getElementById('form-content');
+      const chevron   = document.getElementById('form-chevron');
+      if (collapsed) {
+        content.style.maxHeight = '0';
+        content.style.opacity   = '0';
+        chevron.style.transform = 'rotate(0deg)';
+      } else {
+        content.style.maxHeight = '500px';
+        content.style.opacity   = '1';
+        chevron.style.transform = 'rotate(180deg)';
+      }
+    }
+
+    function toggleForm() {
+      const content   = document.getElementById('form-content');
+      const chevron   = document.getElementById('form-chevron');
+      const collapsed = content.style.maxHeight === '0px' || content.style.maxHeight === '0';
+      if (collapsed) {
+        content.style.maxHeight = '500px';
+        content.style.opacity   = '1';
+        chevron.style.transform = 'rotate(180deg)';
+        localStorage.setItem(FORM_KEY, 'false');
+      } else {
+        content.style.maxHeight = '0';
+        content.style.opacity   = '0';
+        chevron.style.transform = 'rotate(0deg)';
+        localStorage.setItem(FORM_KEY, 'true');
+      }
+    }
+
+    function addTask() {
+      const name = document.getElementById('input-name').value.trim();
+      const cat  = document.getElementById('input-category').value;
+      if (!name) {
+        const inp = document.getElementById('input-name');
+        inp.classList.add('ring-2', 'ring-red-400');
+        inp.focus();
+        setTimeout(() => inp.classList.remove('ring-2', 'ring-red-400'), 1500);
+        return;
+      }
+      tasks.push({ id: Date.now().toString(), name, category: cat, priority: null, deadline: null, memo: '', createdAt: todayStr() });
+      saveData();
+      renderTaskList();
+      document.getElementById('input-name').value = '';
+      document.getElementById('input-name').focus();
+    }
+
+    // ─── Category modal ────────────────────────────────────────
+    function openCategoryModal() {
+      editingCatIdx = -1;
+      document.getElementById('category-modal').classList.remove('hidden');
+      document.getElementById('new-category-input').value = '';
+      renderCategoryList();
+      setTimeout(() => document.getElementById('new-category-input').focus(), 50);
+    }
+
+    function closeCategoryModal() {
+      document.getElementById('category-modal').classList.add('hidden');
+      editingCatIdx = -1;
+    }
+
+    function renderCategoryList() {
+      const ul = document.getElementById('category-list');
+      if (!categories.length) {
+        ul.innerHTML = '<li class="text-center text-gray-400 text-sm py-4">カテゴリがありません</li>';
+        return;
+      }
+      ul.innerHTML = categories.map((cat, i) => {
+        const count = tasks.filter(t => t.category === cat).length;
+        if (i === editingCatIdx) {
+          return `<li class="flex items-center gap-2 rounded-xl px-3 py-2 bg-slate-50">
+  <input id="edit-cat-input" type="text" value="${esc(cat)}"
+    class="flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+    onkeydown="if(event.key==='Enter') saveEditCat(${i}); else if(event.key==='Escape') cancelEditCat()"/>
+  <button onclick="saveEditCat(${i})" class="icon-btn text-slate-600 hover:bg-slate-100">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+  </button>
+  <button onclick="cancelEditCat()" class="icon-btn text-gray-400 hover:bg-gray-100">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+  </button>
+</li>`;
+        }
+        return `<li class="flex items-center gap-1 rounded-xl px-3 py-2 hover:bg-gray-50 group">
+  <div class="flex flex-col mr-1">
+    <button onclick="moveCat(${i},-1)" ${i===0?'disabled':''} class="icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===0?'opacity-20 pointer-events-none':''}">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+    </button>
+    <button onclick="moveCat(${i},1)" ${i===categories.length-1?'disabled':''} class="icon-btn w-5 h-4 text-gray-300 hover:text-gray-500 ${i===categories.length-1?'opacity-20 pointer-events-none':''}">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </button>
+  </div>
+  <span class="flex-1 text-sm text-gray-700">${esc(cat)}</span>
+  ${count > 0 ? `<span class="text-xs text-gray-400">${count}件</span>` : ''}
+  <button onclick="startEditCat(${i})" class="icon-btn text-gray-300 hover:text-slate-500 hover:bg-slate-50 opacity-0 group-hover:opacity-100 transition-opacity">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+  </button>
+  <button onclick="deleteCat(${i})" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+  </button>
+</li>`;
+      }).join('');
+      if (editingCatIdx >= 0) {
+        setTimeout(() => { const el = document.getElementById('edit-cat-input'); if (el) { el.focus(); el.select(); } }, 30);
+      }
+    }
+
+    function startEditCat(i) { editingCatIdx = i; renderCategoryList(); }
+    function cancelEditCat() { editingCatIdx = -1; renderCategoryList(); }
+
+    function saveEditCat(i) {
+      const inp  = document.getElementById('edit-cat-input');
+      const name = inp ? inp.value.trim() : '';
+      if (!name) { if (inp) inp.focus(); return; }
+      if (name === categories[i]) { cancelEditCat(); return; }
+      if (categories.includes(name)) { alert(`「${name}」はすでに存在します`); inp.focus(); return; }
+      const old = categories[i];
+      categories[i] = name;
+      tasks.forEach(t => { if (t.category === old) t.category = name; });
+      saveData(); editingCatIdx = -1;
+      renderCategoryList(); renderCategorySelect(); renderTabs(); renderTaskList();
+    }
+
+    function deleteCat(i) {
+      const name  = categories[i];
+      const count = tasks.filter(t => t.category === name).length;
+      const msg   = count > 0
+        ? `「${name}」は${count}件のタスクで使用中です。\n削除すると別のカテゴリに移動されます。削除しますか？`
+        : `「${name}」を削除しますか？`;
+      if (!confirm(msg)) return;
+      if (count > 0) {
+        const fallback = categories.find((_, idx) => idx !== i) || '';
+        tasks.forEach(t => { if (t.category === name) t.category = fallback; });
+      }
+      categories.splice(i, 1);
+      editingCatIdx = -1;
+      if (activeTab === name) activeTab = 'すべて';
+      saveData();
+      renderCategoryList(); renderCategorySelect(); renderTabs(); renderTaskList();
+    }
+
+    function moveCat(i, dir) {
+      const j = i + dir;
+      if (j < 0 || j >= categories.length) return;
+      [categories[i], categories[j]] = [categories[j], categories[i]];
+      saveData(); renderCategoryList(); renderCategorySelect(); renderTabs();
+    }
+
+    function addCategory() {
+      const inp  = document.getElementById('new-category-input');
+      const name = inp.value.trim();
+      if (!name) { inp.focus(); return; }
+      if (categories.includes(name)) { alert(`「${name}」はすでに存在します`); inp.focus(); return; }
+      categories.push(name);
+      saveData();
+      renderCategoryList(); renderCategorySelect(); renderTabs();
+      document.getElementById('input-category').value = name;
+      inp.value = ''; inp.focus();
+    }
+
+    // ─── Inline editing ───────────────────────────────────────
+    function startEdit(id, field) {
+      editingCell = { id, field };
+      renderTaskList();
+      setTimeout(() => {
+        const el = document.getElementById('edit-cell-input') || document.getElementById('edit-cell-select') || document.getElementById('edit-dl-year');
+        if (el) { el.focus(); if (el.select) el.select(); }
+      }, 30);
+    }
+
+    function cancelEdit() { editingCell = null; renderTaskList(); }
+
+    function saveEdit(id, field) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) { editingCell = null; renderTaskList(); return; }
+      if (field === 'priority') {
+        const sel = document.getElementById('edit-cell-select');
+        task.priority = sel && sel.value !== '' ? parseInt(sel.value) : null;
+      } else if (field === 'deadline') {
+        const y = document.getElementById('edit-dl-year')?.value;
+        const m = document.getElementById('edit-dl-month')?.value;
+        const d = document.getElementById('edit-dl-day')?.value;
+        task.deadline = (y && m && d) ? `${y}-${pad(parseInt(m))}-${pad(parseInt(d))}` : null;
+      } else {
+        const inp = document.getElementById('edit-cell-input');
+        task[field] = inp ? inp.value.trim() : task[field];
+      }
+      saveData(); editingCell = null; renderTaskList();
+    }
+
+    function clearDeadline(id) {
+      const task = tasks.find(t => t.id === id);
+      if (task) { task.deadline = null; saveData(); }
+      editingCell = null; renderTaskList();
+    }
+
+    function updateDlDays() {
+      const y = document.getElementById('edit-dl-year')?.value;
+      const m = document.getElementById('edit-dl-month')?.value;
+      const ds = document.getElementById('edit-dl-day');
+      if (!y || !m || !ds) return;
+      const cur = parseInt(ds.value);
+      const max = new Date(parseInt(y), parseInt(m), 0).getDate();
+      ds.innerHTML = Array.from({ length: max }, (_, i) =>
+        `<option value="${i+1}" ${i+1===Math.min(cur,max)?'selected':''}>${i+1}</option>`
+      ).join('');
+    }
+
+    // ─── Delete ───────────────────────────────────────────────
+    function deleteTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task || !confirm(`「${task.name}」を削除しますか？`)) return;
+      tasks = tasks.filter(t => t.id !== id);
+      saveData(); renderTaskList();
+    }
+
+    // ─── Tabs ─────────────────────────────────────────────────
+    function setTab(tab) { activeTab = tab; renderTabs(); renderTaskList(); }
+
+    function renderTabs() {
+      const container = document.getElementById('tab-list');
+      const tabs = ['すべて', ...categories];
+      if (!tabs.includes(activeTab)) activeTab = 'すべて';
+      container.innerHTML = tabs.map(t => {
+        const active = t === activeTab;
+        return `<button onclick="setTab('${esc(t)}')"
+          class="tab-btn px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 whitespace-nowrap
+            ${active ? 'border-slate-700 text-slate-700 bg-slate-50' : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'}">
+          ${esc(t)}
+        </button>`;
+      }).join('');
+    }
+
+    // ─── Sort ─────────────────────────────────────────────────
+    function setSort(field) {
+      if (sortField === field) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+      else { sortField = field; sortDir = field === 'deadline' ? 'asc' : 'desc'; }
+      updateSortIcons(); renderTaskList();
+    }
+
+    function updateSortIcons() {
+      const pi = document.getElementById('sort-priority-icon');
+      const di = document.getElementById('sort-deadline-icon');
+      if (pi) pi.textContent = sortField === 'priority' ? (sortDir === 'asc' ? '↑' : '↓') : '';
+      if (di) di.textContent = sortField === 'deadline' ? (sortDir === 'asc' ? '↑' : '↓') : '';
+    }
+
+    function sortedTasks(list) {
+      if (!sortField) return [...list];
+      return [...list].sort((a, b) => {
+        if (sortField === 'priority') {
+          const pa = a.priority ?? -1, pb = b.priority ?? -1;
+          return sortDir === 'desc' ? pb - pa : pa - pb;
+        }
+        if (!a.deadline && !b.deadline) return 0;
+        if (!a.deadline) return 1;
+        if (!b.deadline) return -1;
+        return sortDir === 'asc' ? a.deadline.localeCompare(b.deadline) : b.deadline.localeCompare(a.deadline);
+      });
+    }
+
+    // ─── Render helpers ───────────────────────────────────────
+    const pencilSvg = `<svg class="pencil-icon w-3 h-3 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>`;
+    const checkSvg  = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`;
+    const xSvg      = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+
+    function saveBtn(id, field) {
+      return `<button onclick="saveEdit('${esc(id)}','${field}')" class="icon-btn text-slate-500 hover:bg-slate-100">${checkSvg}</button>`;
+    }
+    function cancelBtn() {
+      return `<button onclick="cancelEdit()" class="icon-btn text-gray-300 hover:bg-gray-100">${xSvg}</button>`;
+    }
+
+    // ─── Render task list ─────────────────────────────────────
+    function renderCategorySelect() {
+      const sel  = document.getElementById('input-category');
+      const prev = sel.value;
+      sel.innerHTML = categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+      if (categories.includes(prev)) sel.value = prev;
+    }
+
+    function renderTaskList() {
+      const tbody = document.getElementById('task-list');
+      const empty = document.getElementById('empty-state');
+      const filtered = activeTab === 'すべて' ? tasks : tasks.filter(t => t.category === activeTab);
+
+      if (!filtered.length) {
+        tbody.innerHTML = ''; empty.classList.remove('hidden'); return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = sortedTasks(filtered).map(task => {
+        const isOver = task.deadline && daysLeft(task.deadline) < 0;
+        const days   = daysLeft(task.deadline);
+
+        // ── Name cell
+        const nameCell = editingCell?.id === task.id && editingCell?.field === 'name'
+          ? `<td class="px-4 py-2"><div class="flex items-center gap-1">
+               <input id="edit-cell-input" type="text" value="${esc(task.name)}"
+                 class="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 w-44"
+                 onkeydown="if(event.key==='Enter') saveEdit('${esc(task.id)}','name'); else if(event.key==='Escape') cancelEdit()"/>
+               ${saveBtn(task.id,'name')} ${cancelBtn()}
+             </div></td>`
+          : `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','name')">
+               <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 font-medium text-gray-700">${esc(task.name)} ${pencilSvg}</span>
+             </td>`;
+
+        // ── Priority cell
+        const priCell = editingCell?.id === task.id && editingCell?.field === 'priority'
+          ? `<td class="px-4 py-2 whitespace-nowrap"><div class="flex items-center gap-1">
+               <select id="edit-cell-select"
+                 class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
+                 onkeydown="if(event.key==='Escape') cancelEdit()">
+                 <option value="" ${task.priority===null?'selected':''}>—</option>
+                 <option value="3" ${task.priority===3?'selected':''}>3　高</option>
+                 <option value="2" ${task.priority===2?'selected':''}>2　中</option>
+                 <option value="1" ${task.priority===1?'selected':''}>1　低</option>
+               </select>
+               ${saveBtn(task.id,'priority')} ${cancelBtn()}
+             </div></td>`
+          : `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','priority')">
+               <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5">
+                 ${task.priority
+                   ? `<span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium ${PRI_CLASS[task.priority]}">${PRI_LABEL[task.priority]}</span>`
+                   : `<span class="text-gray-300">—</span>`}
+                 ${pencilSvg}
+               </span>
+             </td>`;
+
+        // ── Deadline cell
+        let dlCell;
+        if (editingCell?.id === task.id && editingCell?.field === 'deadline') {
+          const base  = task.deadline ? new Date(task.deadline + 'T00:00:00') : new Date();
+          const cy = base.getFullYear(), cm = base.getMonth()+1, cd = base.getDate();
+          const maxD  = new Date(cy, cm, 0).getDate();
+          const nowY  = new Date().getFullYear();
+          const years = Array.from({ length: nowY - 2019 + 6 }, (_, i) => 2020 + i);
+          dlCell = `<td class="px-4 py-2 whitespace-nowrap"><div class="flex items-center gap-1 flex-wrap">
+            <select id="edit-dl-year" onchange="updateDlDays()"
+              class="border border-slate-300 rounded-lg px-1.5 py-1.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-400">
+              ${years.map(y=>`<option value="${y}" ${y===cy?'selected':''}>${y}</option>`).join('')}
+            </select><span class="text-gray-400 text-xs">年</span>
+            <select id="edit-dl-month" onchange="updateDlDays()"
+              class="border border-slate-300 rounded-lg px-1.5 py-1.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-400">
+              ${Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${m===cm?'selected':''}>${m}</option>`).join('')}
+            </select><span class="text-gray-400 text-xs">月</span>
+            <select id="edit-dl-day"
+              class="border border-slate-300 rounded-lg px-1.5 py-1.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-400">
+              ${Array.from({length:maxD},(_,i)=>i+1).map(d=>`<option value="${d}" ${d===cd?'selected':''}>${d}</option>`).join('')}
+            </select><span class="text-gray-400 text-xs">日</span>
+            ${saveBtn(task.id,'deadline')}
+            ${task.deadline ? `<button onclick="clearDeadline('${esc(task.id)}')" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50" title="締切日をクリア">${xSvg}</button>` : cancelBtn()}
+            ${task.deadline ? cancelBtn() : ''}
+          </div></td>`;
+        } else {
+          const dLabel = days === null ? '' : isOver
+            ? `<span class="text-red-500 text-xs font-semibold">${Math.abs(days)}日超過</span>`
+            : days === 0
+              ? `<span class="text-orange-500 text-xs font-semibold">今日</span>`
+              : `<span class="text-gray-400 text-xs">あと${days}日</span>`;
+          dlCell = `<td class="px-5 py-3.5 editable-cell" onclick="startEdit('${esc(task.id)}','deadline')" style="min-width:140px">
+            ${task.deadline
+              ? `<div class="space-y-1">
+                   <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 text-gray-600">${formatDate(task.deadline)} ${pencilSvg}</span>
+                   <div class="flex items-center gap-2 px-1.5">
+                     <div class="progress-track flex-1">
+                       <div class="progress-fill ${isOver?'overdue-pulse':''}" style="width:${barPct(days)}%;background-color:${barColor(days)}"></div>
+                     </div>
+                     ${dLabel}
+                   </div>
+                 </div>`
+              : `<span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 text-gray-300">— ${pencilSvg}</span>`}
+          </td>`;
+        }
+
+        // ── Memo cell
+        const memoCell = editingCell?.id === task.id && editingCell?.field === 'memo'
+          ? `<td class="px-4 py-2"><div class="flex items-center gap-1">
+               <input id="edit-cell-input" type="text" value="${esc(task.memo||'')}" placeholder="メモを入力"
+                 class="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 w-48"
+                 onkeydown="if(event.key==='Enter') saveEdit('${esc(task.id)}','memo'); else if(event.key==='Escape') cancelEdit()"/>
+               ${saveBtn(task.id,'memo')} ${cancelBtn()}
+             </div></td>`
+          : `<td class="px-5 py-3.5 editable-cell max-w-xs" onclick="startEdit('${esc(task.id)}','memo')">
+               <span class="cell-inner inline-flex items-center gap-1.5 px-1.5 py-0.5 text-gray-500">
+                 <span class="truncate" style="max-width:12rem">${task.memo ? esc(task.memo) : '<span class="text-gray-300">—</span>'}</span>
+                 ${pencilSvg}
+               </span>
+             </td>`;
+
+        return `<tr class="task-row border-b border-gray-50 ${isOver?'bg-red-50/30':''}">
+  ${nameCell}${priCell}${dlCell}${memoCell}
+  <td class="px-3 py-3.5">
+    <button onclick="deleteTask('${esc(task.id)}')" class="icon-btn text-gray-300 hover:text-red-400 hover:bg-red-50" title="削除">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    </button>
+  </td>
+</tr>`;
+      }).join('');
+    }
+
+    function render() { renderCategorySelect(); renderTabs(); renderTaskList(); updateSortIcons(); }
+
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    // ─── Expose globals ───────────────────────────────────────
+    Object.assign(window, {
+      toggleForm, addTask,
+      openCategoryModal, closeCategoryModal,
+      addCategory, startEditCat, cancelEditCat, saveEditCat, deleteCat, moveCat,
+      startEdit, cancelEdit, saveEdit, clearDeadline, updateDlDays,
+      deleteTask, setTab, setSort, toggleStorageMode,
+    });
+
+    // ─── Init ────────────────────────────────────────────────
+    loadLocal();
+    initFormState();
+    render();
+    updateModeUI();
+    if (storageMode === 'firebase') enableFirebaseListener();
   </script>
 </body>
 </html>
