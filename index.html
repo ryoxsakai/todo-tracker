@@ -111,16 +111,6 @@
           class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap">
           サインアウト
         </button>
-        <span class="text-gray-200">|</span>
-        <span class="text-xs text-gray-400">ローカル</span>
-        <button id="mode-toggle" onclick="toggleStorageMode()" title="保存先を切り替え"
-          class="relative w-10 h-5 rounded-full focus:outline-none"
-          style="background:#d1d5db">
-          <span id="mode-thumb"
-            class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow"
-            style="transform:translateX(0)"></span>
-        </button>
-        <span class="text-xs text-gray-400">Firebase</span>
       </div>
     </div>
   </header>
@@ -333,7 +323,6 @@
 
     const TASKS_KEY = 'todo-tracker-tasks';
     const CATS_KEY  = 'todo-tracker-categories';
-    const MODE_KEY  = 'todo-tracker-mode';
     const FORM_KEY  = 'todo-tracker-form-collapsed';
 
     // ─── Persistence ─────────────────────────────────────────
@@ -351,19 +340,17 @@
       localStorage.setItem(CATS_KEY,  JSON.stringify(categories));
     }
 
-    let storageMode = localStorage.getItem(MODE_KEY) || 'local';
     let fbUnsub = null;
 
     function saveData() {
       saveLocal();
-      if (storageMode === 'firebase' && DB_REF) setDoc(DB_REF, { tasks, categories });
+      if (DB_REF) setDoc(DB_REF, { tasks, categories });
     }
 
     // ─── Firebase ────────────────────────────────────────────
     function enableFirebaseListener() {
       if (fbUnsub || !DB_REF) return;
       fbUnsub = onSnapshot(DB_REF, snapshot => {
-        if (storageMode !== 'firebase') return;
         if (snapshot.exists()) {
           const data = snapshot.data();
           tasks      = data.tasks      || [];
@@ -378,41 +365,6 @@
 
     function disableFirebaseListener() {
       if (fbUnsub) { fbUnsub(); fbUnsub = null; }
-    }
-
-    function updateModeUI() {
-      const toggle = document.getElementById('mode-toggle');
-      const thumb  = document.getElementById('mode-thumb');
-      if (storageMode === 'firebase') {
-        toggle.style.background = '#0d9488';
-        thumb.style.transform   = 'translateX(20px)';
-      } else {
-        toggle.style.background = '#d1d5db';
-        thumb.style.transform   = 'translateX(0)';
-      }
-    }
-
-    async function toggleStorageMode() {
-      if (storageMode === 'firebase') {
-        if (!confirm('ローカル保存に切り替えます。\nFirebaseとの同期を停止し、このデバイスにのみ保存されます。\n続けますか？')) return;
-        disableFirebaseListener();
-        storageMode = 'local';
-        localStorage.setItem(MODE_KEY, 'local');
-        updateModeUI();
-      } else {
-        if (!DB_REF) return;
-        const snapshot = await getDoc(DB_REF);
-        const hasData  = snapshot.exists();
-        const msg = hasData
-          ? 'Firebaseにデータが存在します。\nFirebaseのデータを優先して同期します（ローカルのデータは上書きされます）。\n続けますか？'
-          : 'Firebaseにデータがありません。\n現在のローカルデータをFirebaseにアップロードして同期します。\n続けますか？';
-        if (!confirm(msg)) return;
-        storageMode = 'firebase';
-        localStorage.setItem(MODE_KEY, 'firebase');
-        if (!hasData) setDoc(DB_REF, { tasks, categories });
-        enableFirebaseListener();
-        updateModeUI();
-      }
     }
 
     // ─── Date helpers ─────────────────────────────────────────
@@ -932,8 +884,7 @@
         loadLocal();
         initFormState();
         render();
-        updateModeUI();
-        if (storageMode === 'firebase') enableFirebaseListener();
+        enableFirebaseListener();
       } else {
         updateUserUI(null);
         document.getElementById('login-form').classList.remove('hidden');
@@ -950,12 +901,9 @@
       openCategoryModal, closeCategoryModal,
       addCategory, startEditCat, cancelEditCat, saveEditCat, deleteCat, moveCat,
       startEdit, cancelEdit, saveEdit, clearDeadline, updateDlDays,
-      deleteTask, setTab, setSort, toggleStorageMode,
+      deleteTask, setTab, setSort,
       signInWithGoogle, signOutUser,
     });
-
-    // ─── Init ────────────────────────────────────────────────
-    updateModeUI();
   </script>
 </body>
 </html>
