@@ -280,7 +280,13 @@
 
   <!-- ── ログイン画面 ───────────────────────────────────────────── -->
   <div id="login-screen" class="fixed inset-0 flex items-center justify-center z-50 bg-gray-100">
-    <div class="bg-white rounded-2xl shadow-lg px-8 py-10 mx-4 text-center w-full max-w-sm">
+    <!-- ローディング中 -->
+    <div id="login-loading" class="text-center">
+      <div class="text-5xl mb-4">📋</div>
+      <p class="text-gray-400 text-sm">読み込み中...</p>
+    </div>
+    <!-- ログインフォーム -->
+    <div id="login-form" class="hidden bg-white rounded-2xl shadow-lg px-8 py-10 mx-4 text-center w-full max-w-sm">
       <div class="text-5xl mb-4">📋</div>
       <h1 class="text-2xl font-bold text-gray-800 mb-1">タスクトラッカー</h1>
       <p class="text-gray-400 text-sm mb-8">Googleアカウントでサインインしてください</p>
@@ -300,7 +306,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js';
     import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js';
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js';
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js';
 
     const firebaseConfig = {
       apiKey:            'AIzaSyDr4ujQOf-CFboo5S1vOhARXxV291X0Ojc',
@@ -890,7 +896,7 @@
     // ─── Auth ─────────────────────────────────────────────────
     async function signInWithGoogle() {
       try {
-        await signInWithPopup(auth, provider);
+        await signInWithRedirect(auth, provider);
       } catch(e) {
         console.error('サインインエラー:', e);
         alert('サインインに失敗しました。もう一度お試しください。');
@@ -917,10 +923,12 @@
     }
 
     onAuthStateChanged(auth, user => {
+      document.getElementById('login-loading').classList.add('hidden');
       if (user) {
         DB_REF = doc(db, 'users', user.uid, 'todo-tracker', 'main');
         updateUserUI(user);
         document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('login-form').classList.add('hidden');
         loadLocal();
         initFormState();
         render();
@@ -928,10 +936,13 @@
         if (storageMode === 'firebase') enableFirebaseListener();
       } else {
         updateUserUI(null);
+        document.getElementById('login-form').classList.remove('hidden');
         document.getElementById('login-screen').classList.remove('hidden');
         tasks = []; categories = ['仕事', '個人', 'その他'];
       }
     });
+
+    getRedirectResult(auth).catch(e => console.error('redirect error:', e));
 
     // ─── Expose globals ───────────────────────────────────────
     Object.assign(window, {
